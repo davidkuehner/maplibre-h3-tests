@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset='utf-8' />
+  <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+  <script src="https://unpkg.com/h3-js"></script>
+  <script src='https://unpkg.com/maplibre-gl@2.0.1/dist/maplibre-gl.js'></script>
+  <link href='https://unpkg.com/maplibre-gl@2.0.1/dist/maplibre-gl.css' rel='stylesheet' />
+  <style>
+    body {margin:0;padding:0;}
+    #map {position:absolute;top:0;bottom:0;width:100%;}
+  </style>
+</head>
+<body>
+  <div id='map' style='width: 100%; height: 400px;'></div>
+  <script>
+    var map = new maplibregl.Map({
+      container: 'map',
+      style: 'https://journey-maps-tiles.geocdn.sbb.ch/styles/base_bright_v2_ki/style.json?api_key=xxx',
+      center: [7.243210, 47.133328],
+      zoom: 19.5
+    });
+
+    function getHexPolygone(h3Index) {
+      const hexBoundary = h3.h3ToGeoBoundary(h3Index);
+      hexBoundary.push(hexBoundary[0]); //close ring
+      hexPoly = {
+            "type": "Feature",
+            "properties": [{"name": "my position"}, {"isPath": "yes"}],
+            "geometry": {
+              "type": "Polygon",
+              "coordinates": [hexBoundary]
+              }
+          };
+        return hexPoly;
+    } 
+
+    initialHex = {"type":"FeatureCollection","features":[{"type":"Feature","geometry":{"type":"Point","coordinates":[[5.984999454406173,48.8223225590626]]}}]};
+
+    map.on('load', async () => {
+      map.addSource('hexSource', { type: 'geojson', data: initialHex });
+      map.addLayer({
+        'id': 'hexLayer',
+        'source': 'hexSource',
+        "type": "fill",
+        "paint": {
+          "fill-color": "#00ffff"
+        }
+      });
+      map.addLayer({
+        'id': 'hexLayerline',
+        'source': 'hexSource',
+        "type": "line",
+        "paint": {
+          'line-color': '#00aaaa',
+          'line-width': 2
+        }
+      });
+    });
+
+    resolution = 15;
+    hexagones = [];
+    path = [];
+    h3s = [];
+    map.on("click", function (e) {
+      const h3Index = h3.geoToH3(e.lngLat.lng, e.lngLat.lat, resolution);
+      h3s.push(h3Index);
+      hexagones.push(getHexPolygone(h3Index));
+      if(h3s.length>1) {
+        lines = h3.h3Line(h3s[h3s.length-2], h3s[h3s.length-1]);
+        for (var i = lines.length - 1; i >= 0; i--) {
+          path.push(getHexPolygone(lines[i]));
+        };
+        console.log();
+      }
+      data = {
+        "type": "FeatureCollection",
+          "features": hexagones.concat(path)
+        };
+      const geojsonSource = map.getSource('hexSource');
+      geojsonSource.setData(data);
+    });
+
+  </script>
+
+</body>
+
+</html>
